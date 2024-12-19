@@ -3,15 +3,16 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm  # For progress bar
 
-def generate_hysteresis_loops(num_points=300, num_loops=150, field_max=1.0, num_particles=1000):
+def generate_hysteresis_loops_with_chains(num_points=300, num_loops=150, field_max=1.0, num_chains=10, chain_size=100):
     """
-    Generate synthetic hysteresis loops for an ensemble of single-domain particles.
+    Generate synthetic hysteresis loops for chains of single-domain particles.
 
     Parameters:
         num_points (int): Number of field points in each loop.
         num_loops (int): Number of reversal loops.
         field_max (float): Maximum applied field.
-        num_particles (int): Number of particles in the ensemble.
+        num_chains (int): Number of chains of particles.
+        chain_size (int): Number of particles in each chain.
 
     Returns:
         Ha, Hb, M (numpy arrays): Arrays of reversal fields, applied fields, and magnetizations.
@@ -21,19 +22,22 @@ def generate_hysteresis_loops(num_points=300, num_loops=150, field_max=1.0, num_
     Hb = fields
     M = np.zeros((num_loops, num_points))
 
-    # Random particle properties (e.g., coercivity and interaction field offset)
-    coercivities = np.random.normal(0.2 * field_max, 0.05 * field_max, num_particles)
-    offsets = np.random.normal(0, 0.1 * field_max, num_particles)
+    # Generate chains of particles
+    for chain in tqdm(range(num_chains), desc="Generating chains", leave=True):
+        # Randomize chain properties
+        chain_coercivities = np.random.normal(0.5 * field_max, 0.1 * field_max, chain_size)
+        chain_offsets = np.random.normal(0, 0.2 * field_max, chain_size)
 
-    for p in tqdm(range(num_particles), desc="Generating hysteresis loops", leave=True):
-        for i, h_a in enumerate(Ha):
-            for j, h_b in enumerate(fields):
-                if h_b >= h_a + offsets[p]:
-                    # Gaussian-like switching for magnetization with sharp peaks
-                    M[i, j] += np.exp(-((h_b - offsets[p])**2) / (2 * coercivities[p]**2))
+        for particle in range(chain_size):
+            for i, h_a in enumerate(Ha):
+                for j, h_b in enumerate(fields):
+                    if h_b >= h_a + chain_offsets[particle]:
+                        # Gaussian-like switching for magnetization with chain interactions
+                        M[i, j] += np.exp(-((h_b - chain_offsets[particle])**2) / (2 * chain_coercivities[particle]**2))
 
-    # Normalize by the number of particles
-    M /= num_particles
+    # Normalize by the total number of particles
+    total_particles = num_chains * chain_size
+    M /= total_particles
 
     return Ha, Hb, M
 
@@ -74,8 +78,8 @@ def calculate_forc_distribution(Ha, Hb, M, smoothing_sigma=2):
 
     return H_c, H_u, rho
 
-# Generate synthetic data for an ensemble of particles
-Ha, Hb, M = generate_hysteresis_loops(num_points=300, num_loops=150, field_max=1.0, num_particles=1000)
+# Generate synthetic data for chains of particles
+Ha, Hb, M = generate_hysteresis_loops_with_chains(num_points=300, num_loops=150, field_max=1.0, num_chains=10, chain_size=100)
 
 # Calculate FORC distribution
 H_c, H_u, rho = calculate_forc_distribution(Ha, Hb, M, smoothing_sigma=3)
@@ -85,7 +89,7 @@ plt.figure(figsize=(8, 6))
 contour = plt.contourf(H_u, H_c, rho, levels=np.linspace(-1, 1, 100), cmap="viridis", extend="both")
 plt.colorbar(contour, label="Normalized FORC Distribution (rho)")
 plt.contour(H_u, H_c, rho, levels=np.linspace(-1, 1, 10), colors='black', linewidths=0.5, alpha=0.5)
-plt.title("FORC Diagram")
+plt.title("FORC Diagram for Chains of Particles")
 plt.xlabel("$H_u$ (Interaction Field)")
 plt.ylabel("$H_c$ (Coercivity)")
 plt.show()

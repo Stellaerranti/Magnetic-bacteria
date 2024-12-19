@@ -21,15 +21,24 @@ def generate_hysteresis_loops(num_points=300, num_loops=150, field_max=1.0, num_
     Hb = fields
     M = np.zeros((num_loops, num_points))
 
-    # Random particle properties (e.g., coercivity and interaction field offset)
-    coercivities = np.random.normal(0.4 * field_max, 0.15 * field_max, num_particles)
-    offsets = np.random.normal(0, 0.3 * field_max, num_particles)
+    # Adjust particle count to avoid fractional division issues
+    group_size = num_particles // 3
+    coercivities = np.concatenate([
+        np.random.normal(0.3 * field_max, 0.02 * field_max, group_size),
+        np.random.normal(0.6 * field_max, 0.03 * field_max, group_size),
+        np.random.normal(0.9 * field_max, 0.04 * field_max, num_particles - 2 * group_size)
+    ])
+    offsets = np.concatenate([
+        np.random.normal(-0.4 * field_max, 0.05 * field_max, group_size),
+        np.random.normal(0, 0.05 * field_max, group_size),
+        np.random.normal(0.4 * field_max, 0.05 * field_max, num_particles - 2 * group_size)
+    ])
 
     for p in tqdm(range(num_particles), desc="Generating hysteresis loops", leave=True):
         for i, h_a in enumerate(Ha):
             for j, h_b in enumerate(fields):
                 if h_b >= h_a + offsets[p]:
-                    # Gaussian-like switching for magnetization
+                    # Gaussian-like switching for magnetization with sharp peaks
                     M[i, j] += np.exp(-((h_b - offsets[p])**2) / (2 * coercivities[p]**2))
 
     # Normalize by the number of particles
