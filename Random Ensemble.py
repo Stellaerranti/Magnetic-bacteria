@@ -3,72 +3,82 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
 
-# Parameters for Stoner-Wohlfarth model
-Ku = 1.0  # Uniaxial anisotropy constant
+# Parameters for the particle ensemble
 Ms = 1.0  # Saturation magnetization
 mu0 = 4 * np.pi * 1e-7  # Vacuum permeability
-HK = 2 * Ku / (mu0 * Ms)  # Anisotropy field
 
-# Stoner-Wohlfarth energy equation
-def energy(theta, h, phi):
-    return Ku * np.sin(theta - phi)**2 - mu0 * Ms * h * np.cos(theta)
+# Generate particle parameters
+np.random.seed(42)  # For reproducibility
+num_particles = 1000
+anisotropy_fields = np.random.uniform(0.8, 1.2, num_particles)  # Random HK values
+orientations = np.random.uniform(0, np.pi, num_particles)  # Random orientations
 
-# Solve for equilibrium magnetization states
-def solve_equilibrium(h, phi):
+# Define the energy function
+def energy(theta, H, phi, HK):
+    return -HK * np.cos(2 * (theta - phi)) - Ms * H * np.cos(theta)
+
+# Solve for equilibrium angle of magnetization
+def equilibrium_angle(H, phi, HK):
     theta_vals = np.linspace(0, 2 * np.pi, 1000)
-    energies = energy(theta_vals, h, phi)
+    energies = energy(theta_vals, H, phi, HK)
     min_idx = np.argmin(energies)
     return theta_vals[min_idx]
 
-# Generate magnetization for an ensemble of particles
-def generate_ensemble(H, phi_distribution):
-    M = np.zeros((len(H), len(H)))
-    for Ha_idx, Ha in enumerate(tqdm(H, desc="Processing Ensemble")):
-        for Hb_idx, Hb in enumerate(H):
+# Generate magnetization data for the particle ensemble
+def generate_magnetization(H_range, anisotropy_fields, orientations):
+    M = np.zeros((len(H_range), len(H_range)))
+    for i, Ha in enumerate(tqdm(H_range, desc="Generating FORCs")):
+        for j, Hb in enumerate(H_range):
             if Hb >= Ha:
-                # Iterate over particles with varying phi values
                 magnetization = 0
-                for phi in phi_distribution:
-                    theta = solve_equilibrium(Hb / HK, phi)
+                for k in range(len(anisotropy_fields)):
+                    HK = anisotropy_fields[k]
+                    phi = orientations[k]
+                    theta = equilibrium_angle(Hb, phi, HK)
                     magnetization += Ms * np.cos(theta)
-                M[Ha_idx, Hb_idx] = magnetization / len(phi_distribution)
+                M[i, j] = magnetization / len(anisotropy_fields)
             else:
-                M[Ha_idx, Hb_idx] = 0
+                M[i, j] = 0
     return M
 
-# Calculate FORC distribution using second derivatives
-def calculate_forc(M, H):
+# Calculate the FORC distribution
+def calculate_forc_distribution(M, H_range):
     FORC = np.zeros_like(M)
-    for i in range(1, len(H) - 1):
-        for j in range(1, len(H) - 1):
+    for i in range(1, len(H_range) - 1):
+        for j in range(1, len(H_range) - 1):
             d2M = (M[i + 1, j + 1] - M[i + 1, j - 1] - M[i - 1, j + 1] + M[i - 1, j - 1]) / 4
             FORC[i, j] = d2M
     return FORC
 
-# Main parameters
-H = np.linspace(-2.0 * HK, 2.0 * HK, 200)  # Magnetic field range
-phi_distribution = np.linspace(0, np.pi / 2, 50)  # Randomly distributed easy axes
+# Normalize data for plotting
+def normalize_data(data):
+    return data / np.max(np.abs(data))
 
-# Generate FORCs for the ensemble
-M_ensemble = generate_ensemble(H, phi_distribution)
+# Main parameters
+H_range = np.linspace(-2.0, 2.0, 300)  # Magnetic field range
+
+# Generate FORC magnetization data
+M = generate_magnetization(H_range, anisotropy_fields, orientations)
 
 # Calculate FORC distribution
-FORC = calculate_forc(M_ensemble, H)
+FORC = calculate_forc_distribution(M, H_range)
 
-# Enhance peaks by smoothing
-FORC_smoothed = gaussian_filter(FORC, sigma=0.5)
+# Normalize FORC data
+FORC_normalized = normalize_data(FORC)
+
+# Apply Gaussian smoothing
+FORC_smoothed = gaussian_filter(FORC_normalized, sigma=1.0)
 
 # Convert to Hc and Hu coordinates
-Hc = (H[None, :] - H[:, None]) / 2
-Hu = (H[None, :] + H[:, None]) / 2
+Hc = (H_range[None, :] - H_range[:, None]) / 2
+Hu = (H_range[None, :] + H_range[:, None]) / 2
 
 # Plot the FORC diagram
 plt.figure(figsize=(8, 6))
 plt.contourf(Hc, Hu, FORC_smoothed, levels=100, cmap='RdBu_r')
-plt.colorbar(label='FORC Intensity')
+plt.colorbar(label='Normalized FORC Intensity')
 plt.xlabel('Hc (Coercivity)')
 plt.ylabel('Hu (Interaction Field)')
-plt.title('FORC Diagram for Ensemble of Particles')
+plt.title('FORC Diagram for Particle Ensemble with Variations')
 plt.grid()
 plt.show()
- 
