@@ -65,7 +65,7 @@ def calculate_forc_distribution(Ha, Hb, M, smoothing_sigma=2):
     # Apply Gaussian smoothing
     rho = gaussian_filter(rho, sigma=smoothing_sigma)
 
-    # Normalize the FORC distribution
+    # Normalize the FORC distribution to [-1, 1]
     rho /= np.nanmax(np.abs(rho))
 
     # Convert to H_c and H_u coordinates
@@ -82,8 +82,9 @@ H_c, H_u, rho = calculate_forc_distribution(Ha, Hb, M, smoothing_sigma=3)
 
 # Plot FORC diagram
 plt.figure(figsize=(8, 6))
-plt.contourf(H_u, H_c, rho, levels=100, cmap="viridis", extend="both")
-plt.colorbar(label="Normalized FORC Distribution (rho)")
+contour = plt.contourf(H_u, H_c, rho, levels=np.linspace(-1, 1, 100), cmap="viridis", extend="both")
+plt.colorbar(contour, label="Normalized FORC Distribution (rho)")
+plt.contour(H_u, H_c, rho, levels=np.linspace(-1, 1, 10), colors='black', linewidths=0.5, alpha=0.5)
 plt.title("FORC Diagram")
 plt.xlabel("$H_u$ (Interaction Field)")
 plt.ylabel("$H_c$ (Coercivity)")
